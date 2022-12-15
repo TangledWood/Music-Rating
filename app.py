@@ -41,16 +41,14 @@ def admin_required(func):
             
 app = Flask(__name__)
 CORS(app)
-app.config['SECRET_KEY'] = 'b00785513'
+app.config['SECRET_KEY'] = 'cm282001'
 
-#establishing connections between webapp and mongodb
 client = MongoClient("mongodb://127.0.0.1:27017")
 db = client.bizDB
 businesses = db.biz
 users = db.users
 blacklist = db.blacklist
 
-#creating pagination for data within dataset
 @app.route("/api/v1.0/businesses", methods=["GET"])
 def show_all_businesses():
     page_num, page_size = 1, 10
@@ -71,13 +69,11 @@ def show_all_businesses():
         
     return make_response( jsonify(data_to_return), 200)
 
-#creating GET endpoint for our REST api
 @app.route("/api/v1.0/businesses/<string:id>", methods = ["GET"])
 def show_one_business(id):
-    #validating whetehr business ID is valid
     if len(id) != 24 or not all(c in string.hexdigits for c in id):
         return make_response(jsonify({"error" : "Invalid Business ID"}), 404)
-    business = businesses.find_one({"_id": ObjectId(id)}) #finding one business within the DB using mongodb commands
+    business = businesses.find_one({"_id": ObjectId(id)}) 
     if business is not None: 
         business["_id"] = str(business["_id"]) 
         for review in business["reviews"]: 
