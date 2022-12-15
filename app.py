@@ -80,23 +80,20 @@ def show_one_musician(id):
             review["_id"] = str(review["_id"]) 
         return make_response(jsonify( [musician] ), 200) 
     else:
-        return make_response(jsonify({"error" : "Invalid musician ID"}), 404) #bad response
+        return make_response(jsonify({"error" : "Invalid musician ID"}), 404) 
 
-#creating POST endpoint for our REST api
 @app.route("/api/v1.0/musicians/", methods = ["POST"])
 def add_new_musician():
     if len(id) != 24 or not all(c in string.hexdigits for c in id):
         return make_response(jsonify({"error" : "Invalid musician ID"}), 404)
     
-    if "name" in request.form and "town"  in request.form and "rating" in request.form: #estalbishing data fields
-        #new_musician creates schema for adding a new musician object
+    if "name" in request.form and "town"  in request.form and "rating" in request.form: 
         new_musician = {
             "name": request.form["name"],
             "town": request.form["town"],
             "rating": request.form["rating"],
             "reviews": []
         }
-        #DB command to add one new musician object
         new_musician_id = musicians.insert_one(new_musician)
         new_musician_link = "http://127.0.0.1:5000/api/v1.0/musicians/" + \
             str(new_musician_id.inserted_id)
@@ -111,7 +108,6 @@ def edit_musician(id):
     
     if "name" in request.form and "town"  in request.form and "rating" in request.form:
         result = musicians.update_one(
-            #almost the same as adding a new musician except musician ID is required in order to update form data
             {"_id": ObjectId(id) }, 
             {
                 "$set" : {
@@ -121,7 +117,6 @@ def edit_musician(id):
                 }
             }
         )
-        #if the musician ID was correct
         if result.matched_count ==1:
             edit_musician_link = "http://127.0.0.1:5000/api/v1.0/musicians/" + id
             return make_response( jsonify({ "url": edit_musician_link }), 200)
@@ -135,7 +130,6 @@ def edit_musician(id):
 def delete_musician(id):
     if len(id) != 24 or not all(c in string.hexdigits for c in id):
         return make_response(jsonify({"error" : "Invalid musician ID"}), 404)
-    #DB commant to delete one object using the object ID
     result = musicians.delete_one({"_id": ObjectId(id)})
     if result.deleted_count == 1:
         return make_response( jsonify({}), 204)
@@ -144,14 +138,12 @@ def delete_musician(id):
     
 @app.route("/api/v1.0/musicians/<string:id>/reviews", methods = ["POST"])
 def add_new_review(id):
-    #new_review defines schema used for review form data
     new_review = {
         "_id": ObjectId(),
         "username" : request.form["username"],
         "comment": request.form["comment"],
         "stars": request.form["stars"]
     }
-    #We need to update the buisness object with the new review so we pass the musician ID and update the review field with our new review
     musicians.update_one(
         {"_id" : ObjectId(id)},
         {
@@ -164,10 +156,8 @@ def add_new_review(id):
 
 @app.route("/api/v1.0/musicians/<string:id>/reviews", methods = ["GET"])
 def fetch_all_reviews(id):
-    #definding our returned data (reviews) as a list
     data_to_return = []
     musician = musicians.find_one(
-        #we find one review via the musician ID and then project the review without its ID
         {"_id" : ObjectId(id)}, {"reviews" : 1, "_id": 0}
     )
     for review in musician["reviews"]:
@@ -189,13 +179,11 @@ def fetch_one_review(id, review_id):
     
 @app.route("/api/v1.0/musicians/<string:id>/reviews/<string:review_id>", methods = ["PUT"])
 def edit_review(id, review_id):
-    #using $ positonal operator again as it poitns to the single review that matches the ID given, so we onyl update that one review
     edited_review = {
         "reviews.$.username" : request.form["username"],
         "reviews.$.comment" : request.form["comment"],
         "reviews.$.stars" : request.form["stars"]
     }
-    #We update our musician object by setting the review returned by the search as the new review (edited review)
     musicians.update_one(
         {"reviews._id": ObjectId(review_id)},
         {"$set": edited_review}
@@ -206,8 +194,6 @@ def edit_review(id, review_id):
 
 @app.route("/api/v1.0/musicians/<string:id>/reviews/<string:review_id>", methods = ["DELETE"])
 def delete_review(id, review_id):
-    #we again update one musician using the same ID found in the url
-    #to pull from reviews collection the review with the corresponding ID found in the url
     musicians.update_one(
         {"_id" : ObjectId(id)},
         {"$pull" : {"reviews" : { "_id" : ObjectId(review_id) } } }
