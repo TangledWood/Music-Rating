@@ -8,6 +8,16 @@ from functools import wraps
 import bcrypt 
 from flask_cors import CORS
 
+app = Flask(__name__)
+CORS(app)
+app.config['SECRET_KEY'] = 'cm282001'
+
+client = MongoClient("mongodb://127.0.0.1:27017")
+db = client.musiciansDB
+musicians = db.musicians
+users = db.users
+blacklist = db.blacklist
+
 def jwt_required(func):
     @wraps(func)
     def jwt_required_wrapper(*args, **kwargs):
@@ -38,19 +48,9 @@ def admin_required(func):
         else:
             return make_response(jsonify({'message': 'Admin access is required'}), 401)
     return admin_required_wrapper
-            
-app = Flask(__name__)
-CORS(app)
-app.config['SECRET_KEY'] = 'cm282001'
 
-client = MongoClient("mongodb://127.0.0.1:27017")
-db = client.bizDB
-businesses = db.biz
-users = db.users
-blacklist = db.blacklist
-
-@app.route("/api/v1.0/businesses", methods=["GET"])
-def show_all_businesses():
+@app.route("/api/v1.0/musicians", methods=["GET"])
+def show_all_musicians():
     page_num, page_size = 1, 10
     if request.args.get("pn"):
         page_num = int(request.args.get('pn'))
@@ -61,59 +61,57 @@ def show_all_businesses():
     page_start = (page_size * (page_num - 1))
     
     data_to_return = []
-    for business in businesses.find().skip(page_start).limit(page_size):
-        business["_id"] = str(business["_id"])
-        for review in business["reviews"]:
+    for musician in musicians.find().skip(page_start).limit(page_size):
+        musician["_id"] = str(musician["_id"])
+        for review in musician["reviews"]:
             review["_id"] = str(review["_id"])
-        data_to_return.append(business)
+        data_to_return.append(musician)
         
     return make_response( jsonify(data_to_return), 200)
 
-@app.route("/api/v1.0/businesses/<string:id>", methods = ["GET"])
-def show_one_business(id):
+@app.route("/api/v1.0/musicians/<string:id>", methods = ["GET"])
+def show_one_musician(id):
     if len(id) != 24 or not all(c in string.hexdigits for c in id):
-        return make_response(jsonify({"error" : "Invalid Business ID"}), 404)
-    business = businesses.find_one({"_id": ObjectId(id)}) 
-    if business is not None: 
-        business["_id"] = str(business["_id"]) 
-        for review in business["reviews"]: 
+        return make_response(jsonify({"error" : "Invalid musician ID"}), 404)
+    musician = musicians.find_one({"_id": ObjectId(id)}) 
+    if musician is not None: 
+        musician["_id"] = str(musician["_id"]) 
+        for review in musician["reviews"]: 
             review["_id"] = str(review["_id"]) 
-        return make_response(jsonify( [business] ), 200) 
+        return make_response(jsonify( [musician] ), 200) 
     else:
-        return make_response(jsonify({"error" : "Invalid Business ID"}), 404) #bad response
+        return make_response(jsonify({"error" : "Invalid musician ID"}), 404) #bad response
 
 #creating POST endpoint for our REST api
-@app.route("/api/v1.0/businesses/", methods = ["POST"])
-@jwt_required
-def add_new_business():
+@app.route("/api/v1.0/musicians/", methods = ["POST"])
+def add_new_musician():
     if len(id) != 24 or not all(c in string.hexdigits for c in id):
-        return make_response(jsonify({"error" : "Invalid Business ID"}), 404)
+        return make_response(jsonify({"error" : "Invalid musician ID"}), 404)
     
     if "name" in request.form and "town"  in request.form and "rating" in request.form: #estalbishing data fields
-        #new_business creates schema for adding a new business object
-        new_business = {
+        #new_musician creates schema for adding a new musician object
+        new_musician = {
             "name": request.form["name"],
             "town": request.form["town"],
             "rating": request.form["rating"],
             "reviews": []
         }
-        #DB command to add one new business object
-        new_business_id = businesses.insert_one(new_business)
-        new_business_link = "http://127.0.0.1:5000/api/v1.0/businesses/" + \
-            str(new_business_id.inserted_id)
-        return make_response( jsonify({"url" : new_business_link}), 201)
+        #DB command to add one new musician object
+        new_musician_id = musicians.insert_one(new_musician)
+        new_musician_link = "http://127.0.0.1:5000/api/v1.0/musicians/" + \
+            str(new_musician_id.inserted_id)
+        return make_response( jsonify({"url" : new_musician_link}), 201)
     else:
         return make_response(jsonify({"error" : "Missing form data"}), 404)
     
-@app.route("/api/v1.0/businesses/<string:id>", methods = ["PUT"])
-@jwt_required
-def edit_business(id):
+@app.route("/api/v1.0/musicians/<string:id>", methods = ["PUT"])
+def edit_musician(id):
     if len(id) != 24 or not all(c in string.hexdigits for c in id):
-        return make_response(jsonify({"error" : "Invalid Business ID"}), 404)
+        return make_response(jsonify({"error" : "Invalid musician ID"}), 404)
     
     if "name" in request.form and "town"  in request.form and "rating" in request.form:
-        result = businesses.update_one(
-            #almost the same as adding a new business except business ID is required in order to update form data
+        result = musicians.update_one(
+            #almost the same as adding a new musician except musician ID is required in order to update form data
             {"_id": ObjectId(id) }, 
             {
                 "$set" : {
@@ -123,30 +121,28 @@ def edit_business(id):
                 }
             }
         )
-        #if the business ID was correct
+        #if the musician ID was correct
         if result.matched_count ==1:
-            edit_business_link = "http://127.0.0.1:5000/api/v1.0/businesses/" + id
-            return make_response( jsonify({ "url": edit_business_link }), 200)
+            edit_musician_link = "http://127.0.0.1:5000/api/v1.0/musicians/" + id
+            return make_response( jsonify({ "url": edit_musician_link }), 200)
     
         else:
-            return make_response(jsonify({"error" : "Invalid business ID"}), 404)
+            return make_response(jsonify({"error" : "Invalid musician ID"}), 404)
     else:
         return make_response(jsonify({"error" : "Missing form data"}), 404)
     
-@app.route("/api/v1.0/businesses/<string:id>", methods = ["DELETE"])
-@jwt_required
-@admin_required
-def delete_business(id):
+@app.route("/api/v1.0/musicians/<string:id>", methods = ["DELETE"])
+def delete_musician(id):
     if len(id) != 24 or not all(c in string.hexdigits for c in id):
-        return make_response(jsonify({"error" : "Invalid Business ID"}), 404)
+        return make_response(jsonify({"error" : "Invalid musician ID"}), 404)
     #DB commant to delete one object using the object ID
-    result = businesses.delete_one({"_id": ObjectId(id)})
+    result = musicians.delete_one({"_id": ObjectId(id)})
     if result.deleted_count == 1:
         return make_response( jsonify({}), 204)
     else:
-        return make_response(jsonify({"error" : "Invalid business ID"}), 404)
+        return make_response(jsonify({"error" : "Invalid musician ID"}), 404)
     
-@app.route("/api/v1.0/businesses/<string:id>/reviews", methods = ["POST"])
+@app.route("/api/v1.0/musicians/<string:id>/reviews", methods = ["POST"])
 def add_new_review(id):
     #new_review defines schema used for review form data
     new_review = {
@@ -155,45 +151,43 @@ def add_new_review(id):
         "comment": request.form["comment"],
         "stars": request.form["stars"]
     }
-    #We need to update the buisness object with the new review so we pass the business ID and update the review field with our new review
-    businesses.update_one(
+    #We need to update the buisness object with the new review so we pass the musician ID and update the review field with our new review
+    musicians.update_one(
         {"_id" : ObjectId(id)},
         {
             '$push' : {"reviews" : new_review}
         }
     )
-    new_review_link = "http://127.0.0.1:5000/api/v1.0/businesses/" + id + \
+    new_review_link = "http://127.0.0.1:5000/api/v1.0/musicians/" + id + \
         "/reviews/" + str(new_review["_id"])
     return make_response(jsonify({"url": new_review_link}), 201)
 
-@app.route("/api/v1.0/businesses/<string:id>/reviews", methods = ["GET"])
+@app.route("/api/v1.0/musicians/<string:id>/reviews", methods = ["GET"])
 def fetch_all_reviews(id):
     #definding our returned data (reviews) as a list
     data_to_return = []
-    business = businesses.find_one(
-        #we find one review via the business ID and then project the review without its ID
+    musician = musicians.find_one(
+        #we find one review via the musician ID and then project the review without its ID
         {"_id" : ObjectId(id)}, {"reviews" : 1, "_id": 0}
     )
-    for review in business["reviews"]:
+    for review in musician["reviews"]:
         review["_id"] = str(review["_id"])
         data_to_return.append(review)
     return make_response( jsonify( data_to_return ), 200)
 
-@app.route("/api/v1.0/businesses/<string:id>/reviews/<string:review_id>", methods = ["GET"])
-@jwt_required
+@app.route("/api/v1.0/musicians/<string:id>/reviews/<string:review_id>", methods = ["GET"])
 def fetch_one_review(id, review_id):
-    business = businesses.find_one(
+    musician = musicians.find_one(
         { "reviews._id" : ObjectId(review_id) },
         {"_id" : 0, "reviews.$" : 1}
     )
-    if business is None:
-        return make_response(jsonify({"error" : "Invalid Business or Review ID"}), 404)
+    if musician is None:
+        return make_response(jsonify({"error" : "Invalid musician or Review ID"}), 404)
     else:
-        business["reviews"][0]["_id"] = str(business["reviews"][0]["_id"])
-        return make_response( jsonify(business["reviews"][0]), 200)
+        musician["reviews"][0]["_id"] = str(musician["reviews"][0]["_id"])
+        return make_response( jsonify(musician["reviews"][0]), 200)
     
-@app.route("/api/v1.0/businesses/<string:id>/reviews/<string:review_id>", methods = ["PUT"])
-@jwt_required
+@app.route("/api/v1.0/musicians/<string:id>/reviews/<string:review_id>", methods = ["PUT"])
 def edit_review(id, review_id):
     #using $ positonal operator again as it poitns to the single review that matches the ID given, so we onyl update that one review
     edited_review = {
@@ -201,22 +195,20 @@ def edit_review(id, review_id):
         "reviews.$.comment" : request.form["comment"],
         "reviews.$.stars" : request.form["stars"]
     }
-    #We update our business object by setting the review returned by the search as the new review (edited review)
-    businesses.update_one(
+    #We update our musician object by setting the review returned by the search as the new review (edited review)
+    musicians.update_one(
         {"reviews._id": ObjectId(review_id)},
         {"$set": edited_review}
     )
-    edit_review_url = "http://127.0.0.1:5000/api/v1.0/businesses/" + id + \
+    edit_review_url = "http://127.0.0.1:5000/api/v1.0/musicians/" + id + \
         "/reviews/" + review_id
     return make_response( jsonify({"url" : edit_review_url}), 200)
 
-@app.route("/api/v1.0/businesses/<string:id>/reviews/<string:review_id>", methods = ["DELETE"])
-@jwt_required
-@admin_required
+@app.route("/api/v1.0/musicians/<string:id>/reviews/<string:review_id>", methods = ["DELETE"])
 def delete_review(id, review_id):
-    #we again update one business using the same ID found in the url
+    #we again update one musician using the same ID found in the url
     #to pull from reviews collection the review with the corresponding ID found in the url
-    businesses.update_one(
+    musicians.update_one(
         {"_id" : ObjectId(id)},
         {"$pull" : {"reviews" : { "_id" : ObjectId(review_id) } } }
     )
@@ -252,5 +244,3 @@ def logout():
 
 if __name__ == "__main__":
     app.run(debug = True)
-    
-# Figure out how to validate reviews for extra marks 
